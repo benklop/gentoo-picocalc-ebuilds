@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+    <maintainer type="person">
+        <email>benklop@users.noreply.github.com</email>
+        <name>Ben Klop</name>
+    </maintainer>
+    <longdescription lang="en">
+        Android Debug Bridge (ADB) daemon for embedded systems. This package provides
+        the server-side daemon (adbd) that runs on the target device to enable ADB
+        connections for debugging and development. Based on the Android platform 
+        system core with patches for Linux compatibility and embedded use cases.
+    </longdescription>
+    <use>
+        <flag name="static">Build statically linked binary for minimal system dependencies</flag>
+        <flag name="secure">Enable secure authentication mode requiring password or key authentication</flag>
+        <flag name="shell">Enable shell access configuration and logcat utility</flag>
+        <flag name="tcp">Enable TCP port configuration for network ADB connections</flag>
+    </use>
+    <upstream>
+        <remote-id type="github">android/platform_system_core</remote-id>
+    </upstream>
+</pkgmetadata>
