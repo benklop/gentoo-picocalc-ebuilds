@@ -1,0 +1,287 @@
+diff --git a/man/openrc-shutdown.8 b/man/openrc-shutdown.8
+index 6d470a5f..4b493da9 100644
+--- a/man/openrc-shutdown.8
++++ b/man/openrc-shutdown.8
+@@ -73,6 +73,9 @@ instruct openrc-init to re-exec itself. This should be used after an
+ upgrade of OpenRC if you are using openrc-init as your init process.
+ .It Fl r , -reboot
+ Stop all services, kill all processes and reboot the system.
++An optional argument can be provided after the time to specify special
++reboot modes (e.g., "loader", "fastboot", etc.) that will be passed to
++the kernel reboot system call.
+ .It Fl s , -single
+ Stop all services, kill all processes and move to single user mode.
+ .It Fl w , -write-only
+diff --git a/src/openrc-init/openrc-init.c b/src/openrc-init/openrc-init.c
+index 8fc21ca3..5f74b71e 100644
+--- a/src/openrc-init/openrc-init.c
++++ b/src/openrc-init/openrc-init.c
+@@ -34,6 +34,11 @@
+ #include <sys/wait.h>
+ #include <poll.h>
+ #include <utmp.h>
++#include <sys/syscall.h>
++
++#ifdef __linux__
++#include <linux/reboot.h>
++#endif
+ 
+ #ifdef HAVE_SELINUX
+ #  include <selinux/selinux.h>
+@@ -217,6 +222,84 @@ static void reap_zombies(int sig RC_UNUSED)
+ 	errno = saved_errno;
+ }
+ 
++static volatile int caught_sigterm = 0;
++static void reboot_signal_handler(int sig)
++{
++	if (sig == SIGTERM)
++		caught_sigterm = 1;
++}
++
++static int reboot_with_arg(const char *runlevel, const char *arg)
++{
++	struct sigaction sa;
++	int pid;
++	const long ms_to_ns = 1000000L;
++	struct timespec start, now, tmp, remain;
++
++	/* Single fork and setsid to detach from ADB process tree */
++	if ((pid = fork()))
++		return pid < 0 ? pid : 0;
++	
++	/* Child: create new session and detach from controlling terminal */
++	setsid();
++	
++	/* Redirect I/O to avoid keeping shell open */
++	close(STDIN_FILENO);
++	close(STDOUT_FILENO);
++	close(STDERR_FILENO);
++	
++	/* Handle signal and reboot in detached child process */
++	sigemptyset(&sa.sa_mask);
++	sa.sa_flags = 0;
++	sa.sa_handler = reboot_signal_handler;
++	sigaction(SIGTERM, &sa, NULL);
++
++	/* Perform shutdown sequence */
++	do_openrc(runlevel);
++	kill(-1, SIGTERM);
++	clock_gettime(CLOCK_MONOTONIC, &start);
++
++	/* ensure *at least* half a second of grace time before KILL */
++	tmp.tv_sec = 0;
++	tmp.tv_nsec = 500 * ms_to_ns;
++	while (clock_nanosleep(CLOCK_MONOTONIC, 0, &tmp, &remain) < 0 && errno == EINTR)
++		tmp = remain;
++
++	/* The init will send SIGTERM to us after SHUTDOWN actions */
++	while (!caught_sigterm) {
++		pid_t wpid = waitpid(-1, NULL, WNOHANG);
++		if (wpid == -1 && errno == ECHILD) {
++			/* all children reaped, safe to exit */
++			break;
++		}
++
++		clock_gettime(CLOCK_MONOTONIC, &now);
++		timespecsub(&now, &start, &tmp);
++		if (tmp.tv_sec >= 3) {
++			/* it's been 3 seconds already, go for the KILL hammer */
++			break;
++		}
++
++		tmp.tv_sec = 0;
++		tmp.tv_nsec = 100 * ms_to_ns;
++		clock_nanosleep(CLOCK_MONOTONIC, 0, &tmp, NULL);
++	}
++
++	if (!quiet)
++		printf("Sending the final KILL signal\n");
++	kill(-1, SIGKILL);
++	sync();
++
++#ifdef __linux__
++	return syscall(__NR_reboot, LINUX_REBOOT_MAGIC1,
++			LINUX_REBOOT_MAGIC2,
++			LINUX_REBOOT_CMD_RESTART2, arg);
++#else
++	/* Fallback to regular reboot if not on Linux */
++	return reboot(RB_AUTOBOOT);
++#endif
++}
++
+ int main(int argc, char **argv)
+ {
+ 	char *default_runlevel;
+@@ -345,17 +428,28 @@ int main(int argc, char **argv)
+ 			if (!quiet)
+ 				printf("PID1: Received \"%s\" from FIFO...\n", buf);
+ 
+-			if (strcmp(buf, "halt") == 0)
++			/* Parse command and arguments */
++			char *cmd = strtok(buf, " ");
++			char *arg = strtok(NULL, " ");
++
++			if (strcmp(cmd, "halt") == 0)
+ 				handle_shutdown("shutdown", RB_HALT_SYSTEM);
+-			else if (strcmp(buf, "kexec") == 0)
++			else if (strcmp(cmd, "kexec") == 0)
+ 				handle_shutdown("reboot", RB_KEXEC);
+-			else if (strcmp(buf, "poweroff") == 0)
++			else if (strcmp(cmd, "poweroff") == 0)
+ 				handle_shutdown("shutdown", RB_POWER_OFF);
+-			else if (strcmp(buf, "reboot") == 0)
+-				handle_shutdown("reboot", RB_AUTOBOOT);
+-			else if (strcmp(buf, "reexec") == 0)
++			else if (strcmp(cmd, "reboot") == 0) {
++				if (arg != NULL) {
++					/* Reboot with argument */
++					reboot_with_arg("reboot", arg);
++				} else {
++					/* Normal reboot */
++					handle_shutdown("reboot", RB_AUTOBOOT);
++				}
++			}
++			else if (strcmp(cmd, "reexec") == 0)
+ 				handle_reexec(argv[0]);
+-			else if (strcmp(buf, "single") == 0) {
++			else if (strcmp(cmd, "single") == 0) {
+ 				handle_single();
+ 				open_shell();
+ 				init(default_runlevel);
+diff --git a/src/openrc-shutdown/openrc-shutdown.c b/src/openrc-shutdown/openrc-shutdown.c
+index 8ffe5a7e..9ad68d54 100644
+--- a/src/openrc-shutdown/openrc-shutdown.c
++++ b/src/openrc-shutdown/openrc-shutdown.c
+@@ -66,7 +66,7 @@ const char * const longopts_help[] = {
+ 	"reboot the system using kexec",
+ 	"power off the system",
+ 	"re-execute init (use after upgrading)",
+-	"reboot the system",
++	"reboot the system, optionally with special argument",
+ 	"single user mode",
+ 	"write wtmp boot record and exit",
+ 	longopts_help_COMMON
+@@ -78,7 +78,7 @@ const char *usagestring = ""
+ 	"   or: openrc-shutdown -H | --halt time\n"
+ 	"   or: openrc-shutdown -K | --kexec time\n"
+ 	"   or: openrc-shutdown -p | --poweroff time\n"
+-	"   or: openrc-shutdown -r | --reboot time\n"
++	"   or: openrc-shutdown -r | --reboot time [reboot_arg]\n"
+ 	"   or: openrc-shutdown -s | --single time";
+ const char *exclusive = "Select one of "
+ 	"--cancel, --halt, --kexec, --poweroff, --reexec, --reboot, --single or \n"
+@@ -96,6 +96,7 @@ static bool do_reexec = false;
+ static bool do_single = false;
+ static bool do_wtmp = true;
+ static bool do_wtmp_only = false;
++static char *reboot_arg = NULL;
+ 
+ static void cancel_shutdown(void)
+ {
+@@ -154,6 +155,41 @@ static void send_cmd(const char *cmd)
+ 	fclose(fifo);
+ }
+ 
++/*
++ * Send a command with argument to our init
++ */
++static void send_cmd_with_arg(const char *cmd, const char *arg)
++{
++	FILE *fifo;
++	size_t ignored;
++	char *full_cmd;
++
++	if (do_dryrun) {
++		einfo("Would send %s %s to init", cmd, arg ? arg : "");
++		return;
++	}
++	if (do_wtmp && (do_halt || do_kexec || do_reboot || do_poweroff))
++		log_wtmp("shutdown", "~~", 0, RUN_LVL, "~~");
++	fifo = fopen(RC_INIT_FIFO, "w");
++	if (!fifo) {
++		perror("fopen");
++		return;
++	}
++
++	if (arg) {
++		xasprintf(&full_cmd, "%s %s", cmd, arg);
++		ignored = fwrite(full_cmd, 1, strlen(full_cmd), fifo);
++		if (ignored != strlen(full_cmd))
++			printf("Error writing to init fifo\n");
++		free(full_cmd);
++	} else {
++		ignored = fwrite(cmd, 1, strlen(cmd), fifo);
++		if (ignored != strlen(cmd))
++			printf("Error writing to init fifo\n");
++	}
++	fclose(fifo);
++}
++
+ /*
+  * sleep without being interrupted.
+  * The idea for this code came from sysvinit.
+@@ -279,6 +315,18 @@ int main(int argc, char **argv)
+ 			eerror("%s: invalid time %s", applet, time_arg);
+ 			usage(EXIT_FAILURE);
+ 		}
++	
++	/* Check for reboot argument after time parameter */
++	if (do_reboot && optind + 1 < argc) {
++		reboot_arg = argv[optind + 1];
++		/* Only accept non-option arguments */
++		if (reboot_arg[0] != '-') {
++			/* Valid reboot argument found */
++		} else {
++			reboot_arg = NULL;
++		}
++	}
++
+ 	if (strchr(time_arg, ':')) {
+ 		if ((sscanf(time_arg, "%2d:%2d", &hour, &min) != 2) ||
+ 				(hour > 23) || (min > 59)) {
+@@ -349,8 +397,12 @@ int main(int argc, char **argv)
+ 	} else if (do_reboot) {
+ 		if (access("/run/initctl", F_OK) == 0)
+ 			sysvinit_runlevel('6');
+-		else
+-			send_cmd("reboot");
++		else {
++			if (reboot_arg)
++				send_cmd_with_arg("reboot", reboot_arg);
++			else
++				send_cmd("reboot");
++		}
+ 	} else if (do_single) {
+ 		if (access("/run/initctl", F_OK) == 0)
+ 			sysvinit_runlevel('S');
+diff --git a/src/reboot/reboot.in b/src/reboot/reboot.in
+index bf50967a..0c4e04a9 100644
+--- a/src/reboot/reboot.in
++++ b/src/reboot/reboot.in
+@@ -22,9 +22,24 @@ if [ -z "${poweroff_arg}" ]; then
+ 	poweroff_arg=--reboot
+ fi
+ 
++# Handle arguments: first arg is time (default "now"), rest are reboot arguments
+ script_args="$@"
+ if [ -z "${script_args}" ]; then
++	# No arguments provided, use default time
+ 	script_args=now
++elif [ $# -eq 1 ] && ! echo "$1" | grep -E '^(\+?[0-9]+|[0-9]{1,2}:[0-9]{2}|now)$' >/dev/null 2>&1; then
++	# Single argument that doesn't look like a time specification
++	# Treat it as a reboot argument with default time
++	script_args="now $1"
++elif [ $# -gt 1 ]; then
++	# Multiple arguments: check if first looks like a time
++	if echo "$1" | grep -E '^(\+?[0-9]+|[0-9]{1,2}:[0-9]{2}|now)$' >/dev/null 2>&1; then
++		# First argument is a time, keep all arguments as-is
++		script_args="$@"
++	else
++		# First argument doesn't look like time, prepend "now"
++		script_args="now $@"
++	fi
+ fi
+ 
+-exec @SBINDIR@/openrc-shutdown ${option_arg} ${poweroff_arg} "${script_args}"
++exec @SBINDIR@/openrc-shutdown ${option_arg} ${poweroff_arg} ${script_args}

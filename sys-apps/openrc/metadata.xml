@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="project">
+		<email>openrc@gentoo.org</email>
+		<name>Gentoo OpenRC Project</name>
+	</maintainer>
+	<longdescription lang="en">
+		OpenRC is a dependency-based init system that maintains compatibility with
+		the system provided by the legacy SysV init. This ebuild contains PicoCalc-specific
+		patches for enhanced functionality.
+	</longdescription>
+	<use>
+		<flag name="audit">Enable support for <pkg>sys-process/audit</pkg></flag>
+		<flag name="bash">Enable <pkg>app-shells/bash</pkg> compatible script support in init.d scripts (installs extra files for enhanced functionality)</flag>
+		<flag name="newnet">Enable the experimental network stack (newnet)</flag>
+		<flag name="netifrc">Enable Gentoo's network stack (netifrc)</flag>
+		<flag name="s6">Enable <pkg>sys-apps/s6</pkg> support</flag>
+		<flag name="sysvinit">Enable SysV init compatibility</flag>
+		<flag name="sysv-utils">Install SysV init compatibility utils</flag>
+	</use>
+	<upstream>
+		<remote-id type="github">openrc/openrc</remote-id>
+	</upstream>
+</pkgmetadata>
