@@ -18,7 +18,7 @@ S="${WORKDIR}/${MY_P}"
 
 LICENSE="Apache-2.0"
 SLOT="0"
-KEYWORDS="~arm ~arm64"
+KEYWORDS="arm ~arm64"
 IUSE="static secure +shell +tcp"
 
 RDEPEND="
