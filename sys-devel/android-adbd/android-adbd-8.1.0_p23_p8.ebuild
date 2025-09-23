@@ -145,7 +145,7 @@ pkg_postinst() {
 	elog ""
 	elog "Service management:"
 	elog "  To start the ADB daemon: rc-service adbd start"
-	elog "  To enable at boot:       rc-update add adbd default"
+	elog "  To disable at boot:      rc-update del adbd default"
 	elog "  To stop the daemon:      rc-service adbd stop"
 	elog ""
 	elog "Manual operation:"
@@ -153,4 +153,10 @@ pkg_postinst() {
 	elog ""
 	elog "Note: This package provides the daemon only. You'll need the ADB"
 	elog "client from android-tools package to connect to it."
+	
+	# Add the service to default runlevel automatically
+	if [[ -x $(type -P rc-update) ]]; then
+		einfo "Adding adbd to default runlevel..."
+		rc-update add adbd default
+	fi
 }
