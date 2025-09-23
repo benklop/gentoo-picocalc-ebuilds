@@ -1,0 +1,75 @@
+#!/sbin/openrc-run
+# Copyright 2025 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+name="Android ADB Daemon"
+description="Android Debug Bridge daemon for device debugging"
+
+command="/usr/bin/adbd"
+command_background="yes"
+pidfile="/run/adbd.pid"
+command_user="root:root"
+
+# Default configuration
+: ${ADBD_TCP_PORT:="5555"}
+: ${ADBD_SHELL:="/bin/bash"}
+: ${ADBD_SECURE:="0"}
+
+depend() {
+	need net
+	use logger
+	after bootmisc
+}
+
+start_pre() {
+	# Set up environment variables
+	export ADB_TCP_PORT="${ADBD_TCP_PORT}"
+	export ADBD_SHELL="${ADBD_SHELL}"
+	
+	if [ "${ADBD_SECURE}" = "1" ]; then
+		export ADB_SECURE=1
+		
+		# Check for ADB keys file if secure mode is enabled
+		if [ ! -f /adb_keys ] && [ ! -f /data/misc/adb/adb_keys ]; then
+			ewarn "Secure mode enabled but no ADB keys found."
+			ewarn "Place public keys in /adb_keys or /data/misc/adb/adb_keys"
+		fi
+	fi
+	
+	# Create directory for keys if it doesn't exist
+	if [ ! -d /data/misc/adb ]; then
+		mkdir -p /data/misc/adb
+		chmod 700 /data/misc/adb
+	fi
+	
+	# Check if shell exists
+	if [ -n "${ADBD_SHELL}" ] && [ ! -x "${ADBD_SHELL}" ]; then
+		ewarn "Configured shell ${ADBD_SHELL} not found, falling back to /bin/sh"
+		export ADBD_SHELL="/bin/sh"
+	fi
+	
+	ebegin "Starting ${name}"
+}
+
+start_post() {
+	eend $?
+	if [ $? -eq 0 ]; then
+		einfo "ADB daemon started successfully"
+		if [ -n "${ADB_TCP_PORT}" ]; then
+			einfo "Listening on TCP port ${ADB_TCP_PORT}"
+		fi
+		if [ "${ADB_SECURE}" = "1" ]; then
+			einfo "Running in secure mode - authentication required"
+		else
+			einfo "Running in non-secure mode - no authentication required"
+		fi
+	fi
+}
+
+stop_pre() {
+	ebegin "Stopping ${name}"
+}
+
+stop_post() {
+	eend $?
+}

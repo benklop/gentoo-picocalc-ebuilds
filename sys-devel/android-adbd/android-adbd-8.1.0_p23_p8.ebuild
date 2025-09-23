@@ -56,6 +56,9 @@ src_prepare() {
 		"0006-adb-daemon-Fix-build-issue-with-old-g.patch"
 		"0007-adb-daemon-Handle-SIGINT.patch"
 		"0008-adb-daemon-Fix-build-issue-with-musl-and-uclibc.patch"
+		"0009-adb-daemon-Fix-cpp-version-header-issue.patch"
+		"0010-adb-daemon-fix-cstring-include.patch"
+		"0011-adb-daemon-fix-openssl3-rsa-deprecation.patch"
 	)
 	
 	# Apply buildroot patches if they exist in files directory
@@ -116,6 +119,10 @@ src_install() {
 	if use secure && [[ -f "${FILESDIR}/adbd-auth" ]]; then
 		dobin "${FILESDIR}/adbd-auth"
 	fi
+	
+	# Install OpenRC init script and configuration
+	doinitd "${FILESDIR}/adbd.initd"
+	doconfd "${FILESDIR}/adbd.confd"
 }
 
 pkg_postinst() {
@@ -133,7 +140,17 @@ pkg_postinst() {
 		elog "Place your ADB public keys in /adb_keys file."
 	fi
 	elog ""
-	elog "To start the ADB daemon, run: adbd"
+	elog "Configuration:"
+	elog "  Edit /etc/conf.d/adbd to configure the daemon"
+	elog ""
+	elog "Service management:"
+	elog "  To start the ADB daemon: rc-service adbd start"
+	elog "  To enable at boot:       rc-update add adbd default"
+	elog "  To stop the daemon:      rc-service adbd stop"
+	elog ""
+	elog "Manual operation:"
+	elog "  To run manually: adbd"
+	elog ""
 	elog "Note: This package provides the daemon only. You'll need the ADB"
 	elog "client from android-tools package to connect to it."
 }

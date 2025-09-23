@@ -1,0 +1,19 @@
+# Configuration for Android ADB Daemon (adbd)
+# /etc/conf.d/adbd
+
+# TCP port for ADB connections (default: 5555)
+# Set to empty to disable TCP listening (USB only)
+ADBD_TCP_PORT="5555"
+
+# Shell to use for ADB shell sessions (default: /bin/bash)
+# Common options: /bin/bash, /bin/sh, /bin/zsh
+ADBD_SHELL="/bin/bash"
+
+# Enable secure mode (default: 0)
+# When enabled (1), requires RSA key authentication
+# Public keys should be placed in /adb_keys or /data/misc/adb/adb_keys
+ADBD_SECURE="0"
+
+# Additional command line arguments for adbd
+# See 'adbd --help' for available options
+#ADBD_OPTS=""
