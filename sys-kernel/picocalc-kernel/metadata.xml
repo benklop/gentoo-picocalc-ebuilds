@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE pkgmetadata SYSTEM "https://www.gentoo.org/dtd/metadata.dtd">
+<pkgmetadata>
+	<maintainer type="person">
+		<email>benklop@gentoo.org</email>
+		<name>Ben Klop</name>
+	</maintainer>
+	<longdescription lang="en">
+		Linux kernel built for PicoCalc hardware with custom patches.
+		This kernel includes:
+		- Custom drivers for PicoCalc keyboard input
+		- PWM sound subsystem for soft PWM audio
+		- ILI9488 display driver support
+		- MCU logging driver
+		- Device tree overlay ConfigFS interface
+		- Video framebuffer console improvements
+		- SD card controller fixes for the RK3506 platform
+	</longdescription>
+	<upstream>
+		<remote-id type="github">benklop/picocalc-luckfox-lyra</remote-id>
+	</upstream>
+</pkgmetadata>

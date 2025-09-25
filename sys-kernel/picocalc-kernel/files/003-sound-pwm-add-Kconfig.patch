@@ -1,0 +1,26 @@
+--- /dev/null
++++ b/sound/pwm/Kconfig
+@@ -0,0 +1,23 @@
++# SPDX-License-Identifier: GPL-2.0-only
++#PWM drivers
++
++menuconfig SND_PWM
++	bool "PWM sound devices"
++	help
++	  Support for sound devices connected via the PWM.
++
++if SND_PWM
++
++config SOFTPWM_SOUND
++	bool "PicoCalc Soft PWM Sound driver"
++	select SND_PCM
++	help
++	  Support for sound devices connected via the MCU Soft PWM.
++
++config PICOCALC_SOUND
++	bool "PicoCalc Hardware PWM Sound driver"
++	select SND_PCM
++	help
++	  Support for sound devices connected via hardware PWM. On PicoCalc this requires modifying pins!
++
++endif	# SND_PWM

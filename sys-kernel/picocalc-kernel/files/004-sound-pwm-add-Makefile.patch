@@ -1,0 +1,7 @@
+--- /dev/null
++++ b/sound/pwm/Makefile
+@@ -0,0 +1,4 @@
++# SPDX-License-Identifier: GPL-2.0
++
++obj-$(CONFIG_SOFTPWM_SOUND) += picocalc-softpwm.o
++obj-$(CONFIG_PICOCALC_SOUND) += picocalc-snd-pwm.o

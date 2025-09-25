@@ -1,0 +1,14 @@
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -514,6 +514,11 @@ config VCPU_STALL_DETECTOR
+ 
+ 	  If you do not intend to run this kernel as a guest, say N.
+ 
++config MCU_LOG
++	bool "MCU Log Driver"
++	help
++	  MCU Log Driver.
++
+ source "drivers/misc/c2port/Kconfig"
+ source "drivers/misc/eeprom/Kconfig"
+ source "drivers/misc/cb710/Kconfig"

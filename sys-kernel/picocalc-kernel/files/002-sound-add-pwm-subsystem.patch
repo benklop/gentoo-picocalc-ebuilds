@@ -1,0 +1,21 @@
+--- a/sound/Kconfig
++++ b/sound/Kconfig
+@@ -101,6 +101,8 @@ endif # SND_DRIVERS
+ 
+ source "sound/virtio/Kconfig"
+ 
++source "sound/pwm/Kconfig"
++
+ endif # SND
+ 
+ endif # !UML
+--- a/sound/Makefile
++++ b/sound/Makefile
+@@ -6,7 +6,7 @@ obj-$(CONFIG_DMASOUND) += oss/dmasound/
+ obj-$(CONFIG_SND) += core/ i2c/ drivers/ isa/ pci/ ppc/ arm/ sh/ synth/ usb/ \
+ 	firewire/ sparc/ spi/ parisc/ pcmcia/ mips/ soc/ atmel/ hda/ x86/ xen/ \
+-	virtio/
++	virtio/ pwm/
+ obj-$(CONFIG_SND_AOA) += aoa/
+ 
+ # This one must be compilable even if sound is configured out
